@@ -13,7 +13,7 @@
 #include <kern/trap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
-
+#define get32(addr) ((uint32_t*)(*(uint32_t*)addr))
 
 struct Command {
 	const char *name;
@@ -25,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "Display information about the stack", mon_backtrace }
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -58,7 +59,39 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	int temp=0;
+	uint32_t ebp,eip,arg1,arg2,arg3,arg4,arg5;
+	struct Eipdebuginfo info;
+	char func_name[64];
+	int func_line;
+	ebp=((uint32_t)&temp)+0x1c;
+	eip=((uint32_t)&temp)+0x20;
+	arg1=((uint32_t)&temp)+0x24;
+	arg2=((uint32_t)&temp)+0x28;
+	arg3=((uint32_t)&temp)+0x2c;
+	arg4=((uint32_t)&temp)+0x30;
+	arg5=((uint32_t)&temp)+0x34;
+	cprintf("Stack backtrace:\n");
+	while(1)
+	{
+		debuginfo_eip((uintptr_t)get32(eip), &info);
+		func_line=(uint32_t)get32(eip)-(uint32_t)info.eip_fn_addr+1;
+		strncpy(func_name,info.eip_fn_name,info.eip_fn_namelen);
+		*(func_name+info.eip_fn_namelen)='\0';
+
+		cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",ebp,get32(eip),get32(arg1),get32(arg2),get32(arg3),\
+		get32(arg4),get32(arg5));
+		cprintf("         %s:%d: %s+%d\n",info.eip_file,info.eip_line,func_name,func_line);
+		if(!get32(ebp))
+		break;
+		ebp=(uint32_t)get32(ebp);
+		eip=ebp+4;
+		arg1=ebp+8;
+		arg2=ebp+0xc;
+		arg3=ebp+0x10;
+		arg4=ebp+0x14;
+		arg5=ebp+0x18;
+	}
 	return 0;
 }
 
