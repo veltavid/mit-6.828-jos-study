@@ -162,6 +162,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs=boot_alloc(NENV*sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -195,6 +196,8 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir,UENVS,ROUNDUP(NENV*sizeof(struct Env),PGSIZE),PADDR(envs),PTE_U);
+	boot_map_region(kern_pgdir,(uintptr_t)envs,ROUNDUP(NENV*sizeof(struct Env),PGSIZE),PADDR(envs),PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -287,7 +290,7 @@ page_init(void)
 	}
 	for(;i<PGNUM(EXTPHYSMEM);i++)
 	pages[i].pp_ref=1;
-	free_ext_i = PGNUM(PADDR(((char*)pages)+npages*8));
+	free_ext_i = PGNUM(PADDR(((char*)pages)+npages*8+NENV*sizeof(struct Env)));
 	for(;i<free_ext_i;i++)
 	pages[i].pp_ref=1;
 	for(;i<npages;i++)
@@ -572,8 +575,39 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
-	return 0;
+	uintptr_t start,end;
+	pte_t *ptep;
+	int result=0;
+	start=ROUNDDOWN((uintptr_t)va,PGSIZE);
+	end=ROUNDUP((uintptr_t)(va+len),PGSIZE);
+	for(;start!=end && !result;start+=PGSIZE)
+	{
+		if(start<ULIM)
+		{
+			ptep=pgdir_walk(curenv->env_pgdir,(void *)start,0);
+			if(ptep)
+			{
+				if((*ptep & (perm | PTE_P)) != (perm | PTE_P))
+				{
+					result=-E_FAULT;
+					user_mem_check_addr=start;
+				}
+			}
+			else
+			{
+				result=-E_FAULT;
+				user_mem_check_addr=start;
+			}
+		}
+		else
+		{
+			result=-E_FAULT;
+			user_mem_check_addr=start;
+		}
+	}
+	if(result<0 && user_mem_check_addr<(uintptr_t)va)
+	user_mem_check_addr=(uintptr_t)va;
+	return result;
 }
 
 //
@@ -758,14 +792,11 @@ check_kern_pgdir(void)
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
-<<<<<<< HEAD
 	// check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
 
-=======
->>>>>>> lab2
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
 		assert(check_va2pa(pgdir, KERNBASE + i) == i);
