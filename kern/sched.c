@@ -29,7 +29,26 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-
+	int i,c;
+	if(!curenv)
+	{
+		i=0;
+		c=0;
+	}
+	else
+	{
+		i=ENVX(curenv->env_id);
+		c=(i+1)%NENV;
+	}
+	do
+	{
+		
+		if(envs[c].env_status==ENV_RUNNABLE)
+		env_run(&envs[c]);
+		c=(c+1)%NENV;
+	}while(c!=i);
+	if(curenv && curenv->env_status==ENV_RUNNING)
+	env_run(curenv);
 	// sched_halt never returns
 	sched_halt();
 }
@@ -55,7 +74,6 @@ sched_halt(void)
 		while (1)
 			monitor(NULL);
 	}
-
 	// Mark that no environment is running on this CPU
 	curenv = NULL;
 	lcr3(PADDR(kern_pgdir));
@@ -67,7 +85,6 @@ sched_halt(void)
 
 	// Release the big kernel lock as if we were "leaving" the kernel
 	unlock_kernel();
-
 	// Reset stack pointer, enable interrupts and then halt.
 	asm volatile (
 		"movl $0, %%ebp\n"
@@ -75,7 +92,7 @@ sched_halt(void)
 		"pushl $0\n"
 		"pushl $0\n"
 		// Uncomment the following line after completing exercise 13
-		//"sti\n"
+		"sti\n"
 		"1:\n"
 		"hlt\n"
 		"jmp 1b\n"
