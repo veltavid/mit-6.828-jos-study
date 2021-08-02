@@ -119,7 +119,16 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-
+	int i;
+	envs[0].env_id=0;
+	env_free_list=envs;
+	for(i=1;i<NENV;i++)
+	{
+		envs[i].env_id=0;
+		env_free_list->env_link=&envs[i];
+		env_free_list=&envs[i];
+	}
+	env_free_list=envs;
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -160,6 +169,7 @@ env_setup_vm(struct Env *e)
 {
 	int i;
 	struct PageInfo *p = NULL;
+	void *p_va;
 
 	// Allocate a page for the page directory
 	if (!(p = page_alloc(ALLOC_ZERO)))
@@ -182,6 +192,11 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	p_va=page2kva(p);
+	memset(p_va,0,PGSIZE);
+	memcpy(p_va,kern_pgdir,PGSIZE);
+	e->env_pgdir=p_va;
+	p->pp_ref++;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -247,6 +262,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+	e->env_tf.tf_eflags|=FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -279,6 +295,19 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	uintptr_t aligned_va;
+	uint32_t t_pages,i;
+	struct PageInfo *temp;
+	aligned_va=ROUNDDOWN((uint32_t)va,PGSIZE);
+	t_pages=((uintptr_t)ROUNDUP(va+len,PGSIZE)-aligned_va)/PGSIZE;
+	for(i=0;i<t_pages;i++)
+	{
+		temp=page_alloc(0);
+		if(!temp)
+		panic("regin_alloc: Run out of free pages\n");
+		page_insert(e->env_pgdir,temp,(void *)aligned_va,PTE_W | PTE_U);
+		aligned_va+=PGSIZE;
+	}
 }
 
 //
@@ -335,11 +364,37 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	struct Proghdr *ph, *eph;
+	struct Elf *elf_bin=(struct Elf *)binary;
+	struct PageInfo *stack_pg,*ph_page;
+	void *ph_ptr;
+	int result;
+
+	ph = (struct Proghdr *) (binary + elf_bin->e_phoff);
+	eph = ph + elf_bin->e_phnum;
+	lcr3(PADDR(e->env_pgdir));
+	for(;ph<eph;ph++)
+	{
+		if(ph->p_type == ELF_PROG_LOAD)
+		{
+			region_alloc(e,(void *)(ph->p_va),ph->p_memsz);
+			memset((void *)(ph->p_va),0,ph->p_memsz);
+			memcpy((void *)(ph->p_va),binary+ph->p_offset,ph->p_filesz);
+		}
+	}
+	lcr3(PADDR(kern_pgdir));
+	e->env_tf.tf_eip=elf_bin->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	stack_pg=page_alloc(0);
+	if(!stack_pg)
+	panic("load_icode: Initialize stack failed\n");
+	result=page_insert(e->env_pgdir,stack_pg,(void *)(USTACKTOP-PGSIZE),PTE_U | PTE_W);
+	if(result<0)
+	panic("load_icode: Map stack to the page failed\n");
 }
 
 //
@@ -353,9 +408,16 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+<<<<<<< HEAD
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
+=======
+	struct Env *fbin_env;
+	env_alloc(&fbin_env,0);
+	load_icode(fbin_env,binary);
+	fbin_env->env_type=type;
+>>>>>>> lab4
 }
 
 //
@@ -428,7 +490,6 @@ env_destroy(struct Env *e)
 	}
 
 	env_free(e);
-
 	if (curenv == e) {
 		curenv = NULL;
 		sched_yield();
@@ -447,7 +508,6 @@ env_pop_tf(struct Trapframe *tf)
 {
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
-
 	asm volatile(
 		"\tmovl %0,%%esp\n"
 		"\tpopal\n"
@@ -486,7 +546,20 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+	if(curenv)
+	{
+		//if(curenv->env_status==ENV_DYING)
+		//curenv->env_status=ENV_NOT_RUNNABLE;
+		//else
+		if(curenv->env_status==ENV_RUNNING)
+		curenv->env_status=ENV_RUNNABLE;
+	}
+	curenv=e;
+	curenv->env_status=ENV_RUNNING;
+	curenv->env_runs++;
+	lcr3(PADDR(curenv->env_pgdir));
+	//cprintf("env_run:%d %p %d\n",curenv->env_id,curenv->env_tf.tf_eip,curenv->env_tf.tf_regs.reg_eax);
+	unlock_kernel();
+	env_pop_tf(&curenv->env_tf);
 }
 
