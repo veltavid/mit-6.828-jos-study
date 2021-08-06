@@ -229,7 +229,7 @@ print_regs(struct PushRegs *regs)
 }
 
 static void
-trap_dispatch(struct Trapframe *tf)//probably need to swap lab3 and lab4
+trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
@@ -254,7 +254,8 @@ trap_dispatch(struct Trapframe *tf)//probably need to swap lab3 and lab4
 		lapic_eoi();
 		sched_yield();
 		return;
-
+		case IRQ_OFFSET+IRQ_KBD: kbd_intr();return;
+		case IRQ_OFFSET+IRQ_SERIAL: serial_intr();return;
 		default: break;
 	};
 	// Handle spurious interrupts

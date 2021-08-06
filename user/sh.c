@@ -55,7 +55,13 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			int fd;
+			fd=open(t,O_RDONLY);
+			if(fd)
+			{
+				dup(fd,0);
+				close(fd);
+			}
 			break;
 
 		case '>':	// Output redirection

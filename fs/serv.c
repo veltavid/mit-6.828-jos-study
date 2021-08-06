@@ -91,7 +91,7 @@ openfile_lookup(envid_t envid, uint32_t fileid, struct OpenFile **po)
 
 	o = &opentab[fileid % MAXOPEN];
 	if (pageref(o->o_fd) <= 1 || o->o_fileid != fileid)
-		return -E_INVAL;
+	return -E_INVAL;
 	*po = o;
 	return 0;
 }
@@ -194,7 +194,6 @@ serve_set_size(envid_t envid, struct Fsreq_set_size *req)
 	// On failure, return the error code to the client with ipc_send.
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
-
 	// Second, call the relevant file system function (from fs/fs.c).
 	// On failure, return the error code to the client.
 	return file_set_size(o->o_file, req->req_size);
@@ -214,7 +213,15 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+	int r;
+	struct OpenFile *o;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+	return r;
+	r=file_read(o->o_file,ret->ret_buf,req->req_n,o->o_fd->fd_offset);
+	if(r<0)
+	return r;
+	o->o_fd->fd_offset+=r;
+	return r;
 }
 
 
@@ -229,8 +236,18 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	int r;
+	struct OpenFile *o;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+	return r;
+	r=file_write(o->o_file,req->req_buf,req->req_n,o->o_fd->fd_offset);
+	if(r<0)
+	return r;
+	o->o_fd->fd_offset+=r;
+	return r;
 }
+
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
 // caller in ipc->statRet.
@@ -339,7 +356,7 @@ umain(int argc, char **argv)
 
 	serve_init();
 	fs_init();
-        fs_test();
+    fs_test();
 	serve();
 }
 
