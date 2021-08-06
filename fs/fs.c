@@ -62,7 +62,16 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	int i;
+	for(i=1;i<super->s_nblocks;i++)
+	{
+		if(bitmap[i/32]&(1<<(i%32)))
+		{
+			bitmap[i/32]&=~(1<<(i%32));
+			flush_block(bitmap);
+			return i;
+		}
+	}
 	return -E_NO_DISK;
 }
 
@@ -134,8 +143,30 @@ fs_init(void)
 static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
-       // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+    	// LAB 5: Your code here.
+		int f_didx,new_blk_no;
+
+		if(filebno>=NDIRECT+NINDIRECT)
+		return -E_INVAL;
+		int i;
+    	if(filebno<NDIRECT)
+		{
+			*ppdiskbno=&f->f_direct[filebno];
+			return 0;
+		}
+		if(f->f_indirect==0) //|| f->f_indirect>=super->s_nblocks)
+		{
+			if(!alloc)
+			return -E_NOT_FOUND;
+			new_blk_no=alloc_block();
+			if(new_blk_no<0)
+			return -E_NO_DISK;
+			f->f_indirect=new_blk_no;
+			memset(diskaddr(f->f_indirect),0,BLKSIZE);
+		}
+		f_didx=filebno-NDIRECT;
+		*ppdiskbno=(uint32_t *)(diskaddr(f->f_indirect)+f_didx*4);
+		return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -149,8 +180,23 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
-       // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+		// LAB 5: Your code here.
+		uint32_t *ppdiskbno;
+		int new_blk_no;
+		int r;
+		r=file_block_walk(f,filebno,&ppdiskbno,1);
+		if(r<0)
+		return r;
+		if(*ppdiskbno==0)
+		{
+			new_blk_no=alloc_block();
+			if(new_blk_no<0)
+			return E_NO_DISK;
+			*ppdiskbno=new_blk_no;
+			memset(diskaddr(new_blk_no),0,BLKSIZE);
+		}
+		*blk=(char *)diskaddr(*ppdiskbno);
+		return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
@@ -405,7 +451,6 @@ file_truncate_blocks(struct File *f, off_t newsize)
 	for (bno = new_nblocks; bno < old_nblocks; bno++)
 		if ((r = file_free_block(f, bno)) < 0)
 			cprintf("warning: file_free_block: %e", r);
-
 	if (new_nblocks <= NDIRECT && f->f_indirect) {
 		free_block(f->f_indirect);
 		f->f_indirect = 0;

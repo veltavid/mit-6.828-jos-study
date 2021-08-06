@@ -21,6 +21,7 @@ umain(int argc, char **argv)
 	// check fork
 	if ((r = fork()) < 0)
 		panic("fork: %e", r);
+
 	if (r == 0) {
 		strcpy(VA, msg);
 		exit();
