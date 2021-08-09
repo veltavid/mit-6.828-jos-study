@@ -112,11 +112,23 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, int perm)
 int
 sys_ipc_recv(void *dstva)
 {
-	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, 0, 0, 0, 0);
+	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, 0, 0, 0, 0);;
 }
 
 unsigned int
 sys_time_msec(void)
 {
 	return (unsigned int) syscall(SYS_time_msec, 0, 0, 0, 0, 0, 0);
+}
+
+int
+sys_e1000_try_tx(void *buf,uint32_t size)
+{
+	return syscall(SYS_e1000_try_tx,0,(uint32_t)buf,size,0,0,0);
+}
+
+int
+sys_e1000_rx(void *buf,int *size)
+{
+	return syscall(SYS_e1000_rx,0,(uint32_t)buf,(uint32_t)size,0,0,0);
 }

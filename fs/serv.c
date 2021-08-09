@@ -356,10 +356,7 @@ umain(int argc, char **argv)
 
 	serve_init();
 	fs_init();
-<<<<<<< HEAD
-=======
     fs_test();
->>>>>>> lab5
 	serve();
 }
 

@@ -252,6 +252,7 @@ trap_dispatch(struct Trapframe *tf)
 		case IRQ_OFFSET+IRQ_TIMER:
 		if(curenv && curenv->env_status==ENV_RUNNING)
 		curenv->env_status=ENV_RUNNABLE;
+		time_tick();
 		lapic_eoi();
 		sched_yield();
 		return;

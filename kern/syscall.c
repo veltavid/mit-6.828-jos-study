@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -362,7 +363,10 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if(!recv)
 	return -E_BAD_ENV;
 	if(!recv->env_ipc_recving)
-	return -E_IPC_NOT_RECV;
+	{
+		//cprintf("%d %d\n",envid,recv->env_id);
+		return -E_IPC_NOT_RECV;
+	}
 	if((uintptr_t)srcva < UTOP)
 	{
 		result=-E_INVAL;
@@ -449,7 +453,23 @@ static int
 sys_time_msec(void)
 {
 	// LAB 6: Your code here.
-	panic("sys_time_msec not implemented");
+	return time_msec();
+}
+
+static int
+sys_e1000_try_tx(void *buf,uint32_t size)
+{
+	int r;
+	//while(1)
+	user_mem_assert(curenv,buf,size,0);
+	r=tx_packet(buf,size);
+	return r;
+}
+
+static int
+sys_e1000_rx(void *buf,int *size)
+{
+	return rx_packet(buf,size);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -477,6 +497,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		case SYS_yield: sys_yield();break;
 		case SYS_ipc_try_send: result=sys_ipc_try_send(a1,a2,(void *)a3,a4);break;
 		case SYS_ipc_recv: result=sys_ipc_recv((void *)a1);break;
+		case SYS_time_msec: result=sys_time_msec();break;
+		case SYS_e1000_try_tx: result=sys_e1000_try_tx((void *)a1,a2);break;
+		case SYS_e1000_rx: result=sys_e1000_rx((void *)a1,(int *)a2);
 		case NSYSCALLS: break;
 		default:return -E_INVAL;
 	}

@@ -31,7 +31,7 @@ int errno;
 
 struct netif nif;
 
-#define debug 0
+#define debug 1
 
 struct timer_thread {
 	uint32_t msec;
@@ -315,7 +315,6 @@ void
 umain(int argc, char **argv)
 {
 	envid_t ns_envid = sys_getenvid();
-
 	binaryname = "ns";
 
 	// fork off the timer thread which will send us periodic messages
