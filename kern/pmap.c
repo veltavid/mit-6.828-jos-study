@@ -11,12 +11,12 @@
 #include <kern/env.h>
 
 // These variables are set by i386_detect_memory()
-size_t npages;			// Amount of physical memory (in pages)
+size_t npages=0;			// Amount of physical memory (in pages)
 static size_t npages_basemem;	// Amount of base memory (in pages)
 
 // These variables are set in mem_init()
-pde_t *kern_pgdir;		// Kernel's initial page directory
-struct PageInfo *pages;		// Physical page state array
+pde_t *kern_pgdir=0;		// Kernel's initial page directory
+struct PageInfo *pages=0;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
 
 
