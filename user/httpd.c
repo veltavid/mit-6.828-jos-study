@@ -238,9 +238,9 @@ send_file(struct http_request *req)
 	for(path=req->url;*path!='\0' && *path!='/';path++);
 	if(*path=='\0' || !strcmp(path,"/"))
 	{
-		fd=open("./index.html",O_RDONLY);
+		fd=open("/index.htm",O_RDONLY);
 		if(fd<0)
-		fd=open("./index.php",O_RDONLY);
+		fd=open("/index.php",O_RDONLY);
 		if(fd<0)
 		{
 			r=send_error(req,404);
